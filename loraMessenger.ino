@@ -1,3 +1,11 @@
+/* TO DO:
+ *  Add battery percentage
+ *  Setup sleep mode for extended use
+ *  Refine tx power settings
+ *  Fix input character deletion
+ *  Fix extra characters in receive buffer
+ */
+
 #include <Adafruit_GFX.h>
 #include <SPI.h>
 #include <Wire.h>
@@ -28,7 +36,7 @@ Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 #define ILI9341_GRAY    0x8410
 #define ILI9341_WHITE   0xFFFF
 #define ILI9341_RED     0xF800
-#define ILI9341_ORANGE  0xFA60
+//#define ILI9341_ORANGE  0xFA60
 #define ILI9341_YELLOW  0xFFE0  
 #define ILI9341_LIME    0x07FF
 #define ILI9341_GREEN   0x07E0
@@ -36,7 +44,7 @@ Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 #define ILI9341_AQUA    0x04FF
 #define ILI9341_BLUE    0x001F
 #define ILI9341_MAGENTA 0xF81F
-#define ILI9341_PINK    0xF8FF
+//#define ILI9341_PINK    0xF8FF
 
 #define NEOPIXEL_PIN 11
 Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -56,15 +64,13 @@ const uint16_t INPUT_BAR_COLOR = ILI9341_WHITE;
 const uint16_t INPUT_BAR_TEXT_COLOR = ILI9341_BLACK;
 
 // Text input buffer
-#define INPUT_BUFFER_SIZE 128
+#define INPUT_BUFFER_SIZE 256
 char inputBuffer[INPUT_BUFFER_SIZE] = "";
 int inputBufferIndex = 0;
 
 // Message array
-//char* messageArray[] = {};
-//int messageArrayIndex = 0;
-char* messageArray[] = {"First test message","Second test message","[Cage]: TEst"};
-int messageArrayIndex = 3;
+String messageArray[255];
+int messageArrayIndex = 0;
 
 BBQ10Keyboard keyboard;
 
@@ -72,25 +78,20 @@ BBQ10Keyboard keyboard;
 int batteryPercentage;
 
 void setup() {
-  //Serial.begin(9600);
-  Serial.begin(115200);
-  
+  Serial.begin(4800);
+  Serial.println("Beginning setup...");
+
   // Initialize LoRa
-  if (!rf95.init())
-  {
+  if (!rf95.init()) {
     Serial.println("LoRa init failed!");
-    messageArray[messageArrayIndex] = "WARNING: Unable to initialize radio!";
-    messageArrayIndex++;
-    while (1);
   }
-  if (!rf95.setFrequency(915.0))
-  {
+  if (!rf95.setFrequency(915.0)) {
     Serial.println("setFrequency failed!");
-    messageArray[messageArrayIndex] = "WARNING: Unable to set frequency on the radio!";
-    messageArrayIndex++;
-    while (1);
   }
-  rf95.setTxPower(23, false); // 23dBm, +20dB boost
+  if (!rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512)) {
+    Serial.println("setModemConfig failed!");
+  }
+  //rf95.setTxPower(23, false); // 23dBm, +20dB boost
 
   // Initialize Screen
   tft.begin();
@@ -98,36 +99,21 @@ void setup() {
 
   // Initialize Neopixel
   neopixel.begin();
-  neopixel.show(); // Turn off neopixel
+  //neopixel.show(); // Turn off neopixel
   
   keyboard.begin();
 
   updateScreen();
+
+  Serial.println("Setup complete, beginning program.");
+  flashNeopixel(255, 255, 255, 10);
 }
 
 void loop() {
   // Wait for user input from the attached keyboard FeatherWing
   while (true) {
-    if (keyboard.keyCount()) {
-      const BBQ10Keyboard::KeyEvent key = keyboard.keyEvent();
-      if (key.state == BBQ10Keyboard::StateRelease) {
-        if (key.key == '\n') { // If enter key is pressed, send the text as a LoRa message
-          inputBuffer[inputBufferIndex] = '\0'; // Null-terminate the text
-          //tft.println();
-          sendLoRaMessage(inputBuffer);
-          break;
-        } else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is pressed, delete previous character
-          inputBuffer[inputBufferIndex] = ' ';
-          inputBufferIndex--;
-          updateScreen();
-        } else if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
-          inputBuffer[inputBufferIndex++] = key.key;
-          updateScreen();
-        }
-      }
-    }
-  
     // Check for incoming messages
+    rf95.setModeRx();
     if (rf95.available()) {
       // Receive message
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
@@ -140,7 +126,27 @@ void loop() {
         // Flash neopixel red
         flashNeopixel(255, 0, 0, 127);
         
-        updateScreen();
+        //updateScreen();
+        drawMessageArea();
+      }
+    }
+
+    if (keyboard.keyCount()) {
+      const BBQ10Keyboard::KeyEvent key = keyboard.keyEvent();
+      if (key.state == BBQ10Keyboard::StateRelease) {
+        if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
+          inputBuffer[inputBufferIndex++] = key.key;
+          drawInputBar(inputBuffer);       
+        } 
+        else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is pressed, delete previous character
+          inputBuffer[inputBufferIndex--] = 0;
+          drawInputBar(inputBuffer);
+        }
+        else if (key.key == '\n' && inputBufferIndex > 0) { // If enter key is pressed, send the text as a LoRa message
+          inputBuffer[inputBufferIndex] = '\0'; // Null-terminate the text
+          sendLoRaMessage((char*) inputBuffer);
+          break; 
+        }
       }
     }
   }
@@ -148,6 +154,8 @@ void loop() {
 
 void drawStatusBar()
 {
+  Serial.println("Calling drawStatusBar()");
+
   // Draw status bar at the top
   tft.fillRect(0, 0, TFT_WIDTH, STATUS_BAR_HEIGHT, STATUS_BAR_COLOR);
   tft.setTextColor(STATUS_BAR_TEXT_COLOR);
@@ -156,59 +164,85 @@ void drawStatusBar()
   //tft.print("Device: ");
   tft.print(DEVICE_NAME);
   tft.setCursor(TFT_WIDTH - 25, 2);
+  // TO FIX: Calculate battery percentage
   tft.print("100%");
+
+  Serial.println("Completing drawStatusBar()");
 }
 
 void drawMessageArea()
 {
+  Serial.println("Calling drawMessageArea()");
+  
   // Draw message area in the middle
   tft.fillRect(0, STATUS_BAR_HEIGHT, TFT_WIDTH, (TFT_HEIGHT - (STATUS_BAR_HEIGHT + INPUT_BAR_HEIGHT)), MESSAGE_WINDOW_COLOR);
   tft.setTextSize(1);
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   // For loop to display latest message at the bottom, with preceding above
-  int messagesDisplayed = 0;
+  int messagesDisplayed = 1;
   int lineHeight = 10;
-  for(int i = messageArrayIndex; i >= 0; i--) {
+  for(int i = messageArrayIndex - 1; i >= 0; i--) {
     if(i % 2 == 0) {
         tft.setTextColor(MESSAGE_TEXT_COLOR);
     }    
     else {
         tft.setTextColor(MESSAGE_ALT_TEXT_COLOR);
     }
-    tft.setCursor(5, TFT_HEIGHT - INPUT_BAR_HEIGHT - (lineHeight * messagesDisplayed));
-    tft.println(messageArray[i]);
+    tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - (lineHeight * messagesDisplayed));
+      Serial.print("   Outputting message #");
+      Serial.print(i);
+      Serial.print(" ");
+      Serial.println((String) messageArray[i]);
+    tft.println((String) messageArray[i]);  
     messagesDisplayed++;
   }
+
+  Serial.println("Completing drawMessageArea()");
 }
 
 void drawInputBar(const char* text)
 {
-  char message[256];
+  Serial.println("Calling drawInputBar()");
   
   // Draw input bar at the bottom
-  tft.fillRoundRect(0, (TFT_HEIGHT - INPUT_BAR_HEIGHT), TFT_WIDTH, INPUT_BAR_HEIGHT, 10, INPUT_BAR_COLOR);
+  //tft.fillRoundRect(0, (TFT_HEIGHT - INPUT_BAR_HEIGHT), TFT_WIDTH, INPUT_BAR_HEIGHT, 10, INPUT_BAR_COLOR);
+  tft.fillRect(0, (TFT_HEIGHT - INPUT_BAR_HEIGHT), TFT_WIDTH, INPUT_BAR_HEIGHT, INPUT_BAR_COLOR);
   tft.setTextColor(INPUT_BAR_TEXT_COLOR);
-  tft.setCursor(5, (TFT_HEIGHT - INPUT_BAR_HEIGHT));
-  tft.print(message);
+  tft.setTextSize(2);
+  tft.setCursor(5, (TFT_HEIGHT - INPUT_BAR_HEIGHT + 1));
+  tft.print(text);
+
+  Serial.println("Completing drawInputBar()");
 }
 
 void sendLoRaMessage(const char* text) {
+  Serial.println("Calling sendLoRaMessage()");
+  flashNeopixel(0, 255, 0, 10);
+  
   char message[256];
   
   snprintf(message, sizeof(message), "[%s] %s", DEVICE_NAME, text); // Add device name to the beginning of the message
-  //tft.println(message);
-  // Add outgoing message to message array
-  messageArray[messageArrayIndex] = message;
-  messageArrayIndex++;
-  //updateScreen();
   
-  rf95.send((uint8_t*)message, strlen(message));
+  //rf95.setModeTx();  
+  if(rf95.send((uint8_t*)message, strlen(message))) {
+    Serial.print("Adding message to the array in spot #");
+    Serial.print(messageArrayIndex);
+    Serial.print(": ");
+    Serial.println(message);
+    
+    messageArray[messageArrayIndex] = message;
+    messageArrayIndex++;
+    rf95.waitPacketSent();    
+    Serial.println("Message sent!");
+  }
+  else {
+    Serial.println("ERROR: could not send message!");
+  }
+  drawMessageArea();
+
   // Wait for LoRa message to be sent
-  while (!rf95.waitPacketSent()) {
-    delay(100);
-  }       
-  //delay(2000); // Delay for readability
-  rf95.waitPacketSent();
+  //rf95.waitPacketSent();
+  //rf95.setModeIdle();
   
   // Flash neopixel green
   flashNeopixel(0, 255, 0, 1);
@@ -219,21 +253,33 @@ void sendLoRaMessage(const char* text) {
     inputBuffer[i] = 0;    
   }
   inputBufferIndex = 0;
+  drawInputBar(inputBuffer);
+
+  Serial.println("Completing sendLoRaMessage()");
+  flashNeopixel(0, 255, 0, 10);
 }
 
 void updateScreen() {
+  Serial.println("Calling updateScreen()");
+  
   drawStatusBar();
 
   drawMessageArea();
 
   drawInputBar(inputBuffer);
+
+  Serial.println("Completing updateScreen()");
 }
 
 void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) {
-  neopixel.setPixelColor(0, r, g, b, 127);
+  Serial.println("Calling flashNeoPixel()");
+  
+  neopixel.setPixelColor(0, r, g, b, bright);
   neopixel.show();
-  delay(500);
+  delay(50);
   neopixel.setPixelColor(0, 0, 0, 0);
   neopixel.show();
-  delay(500);
+  delay(50);
+
+  Serial.println("Calling flashNeoPixel()");
 }
