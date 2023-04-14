@@ -24,6 +24,20 @@ const int INPUT_BAR_HEIGHT = 20;
 const int MESSAGE_HEIGHT = 20;
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 
+#define ILI9341_BLACK   0x0000
+#define ILI9341_GRAY    0x8410
+#define ILI9341_WHITE   0xFFFF
+#define ILI9341_RED     0xF800
+#define ILI9341_ORANGE  0xFA60
+#define ILI9341_YELLOW  0xFFE0  
+#define ILI9341_LIME    0x07FF
+#define ILI9341_GREEN   0x07E0
+#define ILI9341_CYAN    0x07FF
+#define ILI9341_AQUA    0x04FF
+#define ILI9341_BLUE    0x001F
+#define ILI9341_MAGENTA 0xF81F
+#define ILI9341_PINK    0xF8FF
+
 #define NEOPIXEL_PIN 11
 Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 bool neopixel_flash = false;
@@ -33,6 +47,7 @@ const uint16_t STATUS_BAR_TEXT_COLOR = ILI9341_BLACK;
 
 const uint16_t MESSAGE_WINDOW_COLOR = ILI9341_BLACK;
 const uint16_t MESSAGE_TEXT_COLOR = ILI9341_WHITE;
+const uint16_t MESSAGE_ALT_TEXT_COLOR = ILI9341_GRAY;
 const uint16_t SENT_MESSAGE_COLOR = ILI9341_GREEN;
 const uint16_t RECEIVED_MESSAGE_COLOR = ILI9341_RED;
 const uint16_t USERNAME_COLOR = ILI9341_BLUE;
@@ -48,8 +63,8 @@ int inputBufferIndex = 0;
 // Message array
 //char* messageArray[] = {};
 //int messageArrayIndex = 0;
-char* messageArray[] = {"First test message","Second test message"};
-int messageArrayIndex = 2;
+char* messageArray[] = {"First test message","Second test message","[Cage]: TEst"};
+int messageArrayIndex = 3;
 
 BBQ10Keyboard keyboard;
 
@@ -79,11 +94,7 @@ void setup() {
 
   // Initialize Screen
   tft.begin();
-  tft.setRotation(1); // Set the rotation of the TFT display
-  tft.fillScreen(ILI9341_BLACK);
-  tft.setTextColor(MESSAGE_TEXT_COLOR);
-  tft.setTextSize(2);
-  tft.setCursor(0, 0);
+  tft.setRotation(1);
 
   // Initialize Neopixel
   neopixel.begin();
@@ -91,12 +102,7 @@ void setup() {
   
   keyboard.begin();
 
-  //updateStatusBar();
-  //drawStatusBar();
-  //drawMessageArea();
-  //drawInputBar(inputBuffer);
   updateScreen();
-
 }
 
 void loop() {
@@ -163,6 +169,12 @@ void drawMessageArea()
   int messagesDisplayed = 0;
   int lineHeight = 10;
   for(int i = messageArrayIndex; i >= 0; i--) {
+    if(i % 2 == 0) {
+        tft.setTextColor(MESSAGE_TEXT_COLOR);
+    }    
+    else {
+        tft.setTextColor(MESSAGE_ALT_TEXT_COLOR);
+    }
     tft.setCursor(5, TFT_HEIGHT - INPUT_BAR_HEIGHT - (lineHeight * messagesDisplayed));
     tft.println(messageArray[i]);
     messagesDisplayed++;
