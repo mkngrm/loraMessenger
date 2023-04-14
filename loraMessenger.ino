@@ -46,6 +46,9 @@ Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 #define ILI9341_MAGENTA 0xF81F
 //#define ILI9341_PINK    0xF8FF
 
+// For battery measurement
+#define VBATPIN A7
+
 #define NEOPIXEL_PIN 11
 Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 bool neopixel_flash = false;
@@ -163,8 +166,15 @@ void drawStatusBar()
   tft.setCursor(2, 2);
   //tft.print("Device: ");
   tft.print(DEVICE_NAME);
+  
   tft.setCursor(TFT_WIDTH - 25, 2);
   // TO FIX: Calculate battery percentage
+  /*float measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  Serial.print("VBat: " ); Serial.println(measuredvbat);
+  */
   tft.print("100%");
 
   Serial.println("Completing drawStatusBar()");
