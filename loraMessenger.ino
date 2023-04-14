@@ -64,11 +64,15 @@ void setup() {
   if (!rf95.init())
   {
     Serial.println("LoRa init failed!");
+    messageArray[messageArrayIndex] = "WARNING: Unable to initialize radio!";
+    messageArrayIndex++;
     while (1);
   }
   if (!rf95.setFrequency(915.0))
   {
     Serial.println("setFrequency failed!");
+    messageArray[messageArrayIndex] = "WARNING: Unable to set frequency on the radio!";
+    messageArrayIndex++;
     while (1);
   }
   rf95.setTxPower(23, false); // 23dBm, +20dB boost
@@ -153,12 +157,13 @@ void drawMessageArea()
 {
   // Draw message area in the middle
   tft.fillRect(0, STATUS_BAR_HEIGHT, TFT_WIDTH, (TFT_HEIGHT - (STATUS_BAR_HEIGHT + INPUT_BAR_HEIGHT)), MESSAGE_WINDOW_COLOR);
-  tft.setTextSize(2);
+  tft.setTextSize(1);
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   // For loop to display latest message at the bottom, with preceding above
   int messagesDisplayed = 0;
+  int lineHeight = 10;
   for(int i = messageArrayIndex; i >= 0; i--) {
-    tft.setCursor(5, TFT_HEIGHT - (INPUT_BAR_HEIGHT * messagesDisplayed));
+    tft.setCursor(5, TFT_HEIGHT - INPUT_BAR_HEIGHT - (lineHeight * messagesDisplayed));
     tft.println(messageArray[i]);
     messagesDisplayed++;
   }
@@ -183,6 +188,7 @@ void sendLoRaMessage(const char* text) {
   // Add outgoing message to message array
   messageArray[messageArrayIndex] = message;
   messageArrayIndex++;
+  //updateScreen();
   
   rf95.send((uint8_t*)message, strlen(message));
   // Wait for LoRa message to be sent
