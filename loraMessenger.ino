@@ -109,33 +109,30 @@ void loop() {
         } else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is pressed, delete previous character
           inputBuffer[inputBufferIndex] = ' ';
           inputBufferIndex--;
-          //tft.print(' ');
-          drawInputBar(inputBuffer);
+          updateScreen();
         } else if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
           inputBuffer[inputBufferIndex++] = key.key;
-          //tft.print(key.key);
-          drawInputBar(inputBuffer);
+          updateScreen();
         }
       }
     }
-
-  // Check for incoming messages
-  if (rf95.available()) {
-    // Receive message
-    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-    uint8_t len = sizeof(buf);
-    if (rf95.recv(buf, &len)) {
-      char* receivedMessage = ((char*) buf);
-      messageArray[messageArrayIndex] = receivedMessage;
-      messageArrayIndex++;
-      
-      // Flash neopixel red
-      flashNeopixel(255, 0, 0, 127);
-    }
-  }
   
-  // Update screen
-  updateScreen();
+    // Check for incoming messages
+    if (rf95.available()) {
+      // Receive message
+      uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+      uint8_t len = sizeof(buf);
+      if (rf95.recv(buf, &len)) {
+        char* receivedMessage = ((char*) buf);
+        messageArray[messageArrayIndex] = receivedMessage;
+        messageArrayIndex++;
+        
+        // Flash neopixel red
+        flashNeopixel(255, 0, 0, 127);
+        
+        updateScreen();
+      }
+    }
   }
 }
 
