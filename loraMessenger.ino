@@ -76,6 +76,8 @@ int inputBufferIndex = 0;
 // Message array
 String messageArray[255];
 int messageArrayIndex = 0;
+//String messageArray[255] = { "Message 1","Message 2", "Message 3" };
+//int messageArrayIndex = 2;
 
 BBQ10Keyboard keyboard;
 
@@ -191,7 +193,7 @@ void drawMessageArea()
   tft.setTextSize(1);
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   // For loop to display latest message at the bottom, with preceding above
-  int messagesDisplayed = 1;
+  int messagesDisplayed = 0;
   for(int i = messageArrayIndex; i >= 0; i--) {
     if(i % 2 == 0) {
         tft.setTextColor(MESSAGE_TEXT_COLOR);
@@ -199,7 +201,7 @@ void drawMessageArea()
     else {
         tft.setTextColor(MESSAGE_ALT_TEXT_COLOR);
     }
-    tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - (MESSAGE_HEIGHT * (i + 1)));
+    tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - (MESSAGE_HEIGHT * messagesDisplayed));
     tft.println((String) messageArray[i]);  
     messagesDisplayed++;
   }
