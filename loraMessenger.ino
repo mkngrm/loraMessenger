@@ -4,6 +4,8 @@
  *  Refine tx power settings
  *  Fix input character deletion
  *  Fix extra characters in receive buffer
+ *  LImit message area to 20 lines of messages
+ *  Set username on boot
  */
 
 #include <Adafruit_GFX.h>
@@ -29,7 +31,7 @@ const int TFT_WIDTH = 320;
 const int TFT_HEIGHT = 240;
 const int STATUS_BAR_HEIGHT = 12;
 const int INPUT_BAR_HEIGHT = 20;
-const int MESSAGE_HEIGHT = 20;
+const int MESSAGE_HEIGHT = 10;
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 
 #define ILI9341_BLACK   0x0000
@@ -190,19 +192,14 @@ void drawMessageArea()
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   // For loop to display latest message at the bottom, with preceding above
   int messagesDisplayed = 1;
-  int lineHeight = 10;
-  for(int i = messageArrayIndex - 1; i >= 0; i--) {
+  for(int i = messageArrayIndex; i >= 0; i--) {
     if(i % 2 == 0) {
         tft.setTextColor(MESSAGE_TEXT_COLOR);
     }    
     else {
         tft.setTextColor(MESSAGE_ALT_TEXT_COLOR);
     }
-    tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - (lineHeight * messagesDisplayed));
-      Serial.print("   Outputting message #");
-      Serial.print(i);
-      Serial.print(" ");
-      Serial.println((String) messageArray[i]);
+    tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - (MESSAGE_HEIGHT * (i + 1)));
     tft.println((String) messageArray[i]);  
     messagesDisplayed++;
   }
@@ -239,9 +236,10 @@ void sendLoRaMessage(const char* text) {
     Serial.print(messageArrayIndex);
     Serial.print(": ");
     Serial.println(message);
+   
+    messageArray[messageArrayIndex++] = message;
+    //messageArrayIndex++; 
     
-    messageArray[messageArrayIndex] = message;
-    messageArrayIndex++;
     rf95.waitPacketSent();    
     Serial.println("Message sent!");
   }
