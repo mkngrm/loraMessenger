@@ -5,6 +5,9 @@
  *  Fix input character deletion
  *  Fix extra characters in receive buffer
  *  Display signal strength of received messages
+ *  GPS
+ *  Speaker to alert on message receipt
+ *  Resend until message acked (possible?)
  */
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +131,7 @@ void loop() ////////////////////////////////////////////////////////////////////
   // Wait for user input from the attached keyboard FeatherWing
   while (true) {
     // Check for incoming messages
-    rf95.setModeRx();
+    //rf95.setModeRx();
     if (rf95.available()) {
       // Receive message
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
@@ -143,6 +146,10 @@ void loop() ////////////////////////////////////////////////////////////////////
         
         //updateScreen();
         drawMessageArea();
+
+        for (int i = 0; i <= len; i++) {
+          buf[i] = 0;
+        }
       }
     }
 
