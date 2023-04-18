@@ -4,9 +4,10 @@
  *  Refine tx power settings
  *  Fix input character deletion
  *  Fix extra characters in receive buffer
- *  LImit message area to 20 lines of messages
- *  Set username on boot
+ *  Display signal strength of received messages
  */
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <Adafruit_GFX.h>
 #include <SPI.h>
@@ -32,6 +33,7 @@ const int TFT_HEIGHT = 240;
 const int STATUS_BAR_HEIGHT = 12;
 const int INPUT_BAR_HEIGHT = 20;
 const int MESSAGE_HEIGHT = 10;
+const int MAX_MESSAGES_DISPLAYED = 20;
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 
 #define ILI9341_BLACK   0x0000
@@ -81,13 +83,16 @@ int messageArrayIndex = 0;
 
 BBQ10Keyboard keyboard;
 
-#define DEVICE_NAME "myMessenger"
+//#define DEVICE_NAME "myMessenger"
+char DEVICE_NAME[INPUT_BUFFER_SIZE]; 
+
 int batteryPercentage;
 
-void setup() {
+void setup() //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
   Serial.begin(4800);
   Serial.println("Beginning setup...");
-
+  
   // Initialize LoRa
   if (!rf95.init()) {
     Serial.println("LoRa init failed!");
@@ -109,14 +114,17 @@ void setup() {
   //neopixel.show(); // Turn off neopixel
   
   keyboard.begin();
-
+  
   updateScreen();
-
+  
+  setUsername();
+  
   Serial.println("Setup complete, beginning program.");
   flashNeopixel(255, 255, 255, 10);
 }
 
-void loop() {
+void loop() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{  
   // Wait for user input from the attached keyboard FeatherWing
   while (true) {
     // Check for incoming messages
@@ -159,7 +167,45 @@ void loop() {
   }
 }
 
-void drawStatusBar()
+void setUsername() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
+  Serial.println("Calling setUsername()");
+  
+  tft.setTextColor(MESSAGE_TEXT_COLOR);
+  tft.setTextSize(1); 
+  tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - 10);  
+  tft.println("Please enter your username: ");
+
+  DEVICE_NAME[0] = 0;
+  while (DEVICE_NAME[0] == 0) {
+    if (keyboard.keyCount()) {
+      const BBQ10Keyboard::KeyEvent key = keyboard.keyEvent();
+      if (key.state == BBQ10Keyboard::StateRelease) {
+        if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
+          inputBuffer[inputBufferIndex++] = key.key;
+          drawInputBar(inputBuffer);       
+        } 
+        else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is pressed, delete previous character
+          inputBuffer[inputBufferIndex--] = 0;
+          drawInputBar(inputBuffer);
+        }
+        else if (key.key == '\n' && inputBufferIndex > 0) { // If enter key is pressed, save the device input
+          inputBuffer[inputBufferIndex] = '\0'; // Null-terminate the text
+          for (int i = 0; i <= inputBufferIndex; i++) {
+            DEVICE_NAME[i] = inputBuffer[i];          
+          }
+        }
+      }
+    }
+  }
+
+  clearInputBuffer();
+  updateScreen();
+  
+  Serial.println("Completing setUsername()");
+}
+
+void drawStatusBar() //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
   Serial.println("Calling drawStatusBar()");
 
@@ -184,7 +230,7 @@ void drawStatusBar()
   Serial.println("Completing drawStatusBar()");
 }
 
-void drawMessageArea()
+void drawMessageArea() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
   Serial.println("Calling drawMessageArea()");
   
@@ -194,7 +240,7 @@ void drawMessageArea()
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   // For loop to display latest message at the bottom, with preceding above
   int messagesDisplayed = 0;
-  for(int i = messageArrayIndex; i >= 0; i--) {
+  for(int i = messageArrayIndex; i >= 0 && messagesDisplayed <= MAX_MESSAGES_DISPLAYED; i--) {
     if(i % 2 == 0) {
         tft.setTextColor(MESSAGE_TEXT_COLOR);
     }    
@@ -209,7 +255,7 @@ void drawMessageArea()
   Serial.println("Completing drawMessageArea()");
 }
 
-void drawInputBar(const char* text)
+void drawInputBar(const char* text) ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
   Serial.println("Calling drawInputBar()");
   
@@ -224,14 +270,17 @@ void drawInputBar(const char* text)
   Serial.println("Completing drawInputBar()");
 }
 
-void sendLoRaMessage(const char* text) {
+void sendLoRaMessage(const char* text) ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
   Serial.println("Calling sendLoRaMessage()");
   flashNeopixel(0, 255, 0, 10);
   
   char message[256];
   
   snprintf(message, sizeof(message), "[%s] %s", DEVICE_NAME, text); // Add device name to the beginning of the message
-  
+  Serial.print("  Message creation: ");
+  Serial.println(message);
+
   //rf95.setModeTx();  
   if(rf95.send((uint8_t*)message, strlen(message))) {
     Serial.print("Adding message to the array in spot #");
@@ -257,19 +306,14 @@ void sendLoRaMessage(const char* text) {
   // Flash neopixel green
   flashNeopixel(0, 255, 0, 1);
   
-  // Clear input buffer
-  //inputBuffer[0] = '\0';
-  for(int i = 0; i <= inputBufferIndex; i++) {
-    inputBuffer[i] = 0;    
-  }
-  inputBufferIndex = 0;
-  drawInputBar(inputBuffer);
+  clearInputBuffer();
 
   Serial.println("Completing sendLoRaMessage()");
   flashNeopixel(0, 255, 0, 10);
 }
 
-void updateScreen() {
+void updateScreen() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
   Serial.println("Calling updateScreen()");
   
   drawStatusBar();
@@ -281,7 +325,8 @@ void updateScreen() {
   Serial.println("Completing updateScreen()");
 }
 
-void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) {
+void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) ///////////////////////////////////////////////////////////////////////////////////////////////////////
+{
   Serial.println("Calling flashNeoPixel()");
   
   neopixel.setPixelColor(0, r, g, b, bright);
@@ -292,4 +337,13 @@ void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) {
   delay(50);
 
   Serial.println("Calling flashNeoPixel()");
+}
+
+void clearInputBuffer() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
+  for(int i = 0; i <= inputBufferIndex; i++) {
+    inputBuffer[i] = 0;    
+  }
+  inputBufferIndex = 0;
+  drawInputBar(inputBuffer);
 }
