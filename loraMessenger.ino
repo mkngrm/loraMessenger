@@ -5,10 +5,12 @@
  *  Fix input character deletion
  *  Fix extra characters in receive buffer
  *  Display signal strength of received messages
+ *  Truncate messages that don't fit on single line
  *  GPS
  *  Speaker to alert on message receipt
  *  Send ack
  *    Resend until message acked
+ *  Change screen/keyboard brightness based on ambient light
  */
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,22 +42,28 @@ const int MESSAGE_HEIGHT = 10;
 const int MAX_MESSAGES_DISPLAYED = 20;
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 
-#define ILI9341_BLACK   0x0000
-#define ILI9341_GRAY    0x8410
-#define ILI9341_WHITE   0xFFFF
-#define ILI9341_RED     0xF800
-//#define ILI9341_ORANGE  0xFA60
-#define ILI9341_YELLOW  0xFFE0  
-#define ILI9341_LIME    0x07FF
-#define ILI9341_GREEN   0x07E0
-#define ILI9341_CYAN    0x07FF
-#define ILI9341_AQUA    0x04FF
-#define ILI9341_BLUE    0x001F
-#define ILI9341_MAGENTA 0xF81F
-//#define ILI9341_PINK    0xF8FF
-
-// For battery measurement
+// For battery monitoring
 #define VBATPIN A7
+
+#define ILI9341_BLACK 0x0000       ///<   0,   0,   0
+#define ILI9341_NAVY 0x000F        ///<   0,   0, 123
+#define ILI9341_DARKGREEN 0x03E0   ///<   0, 125,   0
+#define ILI9341_DARKCYAN 0x03EF    ///<   0, 125, 123
+#define ILI9341_MAROON 0x7800      ///< 123,   0,   0
+#define ILI9341_PURPLE 0x780F      ///< 123,   0, 123
+#define ILI9341_OLIVE 0x7BE0       ///< 123, 125,   0
+#define ILI9341_LIGHTGREY 0xC618   ///< 198, 195, 198
+#define ILI9341_DARKGREY 0x7BEF    ///< 123, 125, 123
+#define ILI9341_BLUE 0x001F        ///<   0,   0, 255
+#define ILI9341_GREEN 0x07E0       ///<   0, 255,   0
+#define ILI9341_CYAN 0x07FF        ///<   0, 255, 255
+#define ILI9341_RED 0xF800         ///< 255,   0,   0
+#define ILI9341_MAGENTA 0xF81F     ///< 255,   0, 255
+#define ILI9341_YELLOW 0xFFE0      ///< 255, 255,   0
+#define ILI9341_WHITE 0xFFFF       ///< 255, 255, 255
+#define ILI9341_ORANGE 0xFD20      ///< 255, 165,   0
+#define ILI9341_GREENYELLOW 0xAFE5 ///< 173, 255,  41
+#define ILI9341_PINK 0xFC18        ///< 255, 130, 198
 
 #define NEOPIXEL_PIN 11
 Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -66,7 +74,7 @@ const uint16_t STATUS_BAR_TEXT_COLOR = ILI9341_BLACK;
 
 const uint16_t MESSAGE_WINDOW_COLOR = ILI9341_BLACK;
 const uint16_t MESSAGE_TEXT_COLOR = ILI9341_WHITE;
-const uint16_t MESSAGE_ALT_TEXT_COLOR = ILI9341_GRAY;
+const uint16_t MESSAGE_ALT_TEXT_COLOR = ILI9341_DARKGREY;
 const uint16_t SENT_MESSAGE_COLOR = ILI9341_GREEN;
 const uint16_t RECEIVED_MESSAGE_COLOR = ILI9341_RED;
 const uint16_t USERNAME_COLOR = ILI9341_BLUE;
@@ -118,9 +126,8 @@ void setup() ///////////////////////////////////////////////////////////////////
   //neopixel.show(); // Turn off neopixel
   
   keyboard.begin();
-  
-  updateScreen();
-  
+
+  updateScreen(); 
   setUsername();
   
   Serial.println("Setup complete, beginning program.");
@@ -142,10 +149,17 @@ void loop() ////////////////////////////////////////////////////////////////////
         // Flash neopixel red
         flashNeopixel(255, 0, 0, 127);
         char* receivedMessage = ((char*) buf);
+        char formattedMessage[256];
+        int rssi = (rf95.lastRssi(), DEC);
+        Serial.print(" Last RSSI: "); Serial.println(rf95.lastRssi());
+        Serial.print(" Last SNR: "); Serial.println(rf95.lastSNR());
+        
+        snprintf(formattedMessage, sizeof(formattedMessage), "%s (%s)", receivedMessage, (rf95.lastRssi(), DEC)); 
 
-        messageArray[messageArrayIndex] = receivedMessage;
+        messageArray[messageArrayIndex] = formattedMessage;
         messageArrayIndex++;
 
+        drawStatusBar(); // Update battery percentage
         drawMessageArea();
       }
       // Clear receiveBuffer
@@ -208,7 +222,7 @@ void setUsername() /////////////////////////////////////////////////////////////
   }
 
   clearInputBuffer();
-  updateScreen();
+  updateScreen(); 
   
   Serial.println("Completing setUsername()");
 }
@@ -222,19 +236,13 @@ void drawStatusBar() ///////////////////////////////////////////////////////////
   tft.setTextColor(STATUS_BAR_TEXT_COLOR);
   tft.setTextSize(1);
   tft.setCursor(2, 2);
-  //tft.print("Device: ");
   tft.print(DEVICE_NAME);
   
-  tft.setCursor(TFT_WIDTH - 25, 2);
-  // TO FIX: Calculate battery percentage
-  /*float measuredvbat = analogRead(VBATPIN);
-  measuredvbat *= 2;    // we divided by 2, so multiply back
-  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-  measuredvbat /= 1024; // convert to voltage
-  Serial.print("VBat: " ); Serial.println(measuredvbat);
-  tft.print(measuredvbat);*/
-  tft.print("100%");
-
+  // TO FIX: Calculate battery percentage            
+  tft.setCursor(TFT_WIDTH - 30, 2);
+  float vBat = readVoltage();
+  tft.print(vBat); tft.print("V");
+  
   Serial.println("Completing drawStatusBar()");
 }
 
@@ -300,6 +308,7 @@ void sendLoRaMessage(const char* text) /////////////////////////////////////////
     Serial.println("ERROR: could not send message!");
   }
   
+  drawStatusBar();
   drawMessageArea();
   clearInputBuffer();
   
@@ -318,9 +327,7 @@ void updateScreen() ////////////////////////////////////////////////////////////
   Serial.println("Calling updateScreen()");
   
   drawStatusBar();
-
   drawMessageArea();
-
   drawInputBar(inputBuffer);
 
   Serial.println(" Completing updateScreen()");
@@ -347,4 +354,43 @@ void clearInputBuffer() ////////////////////////////////////////////////////////
   }
   inputBufferIndex = 0;
   drawInputBar(inputBuffer);
+}
+
+float readVoltage() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
+  float measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+
+  tft.begin();
+  tft.setRotation(1);
+
+  return measuredvbat;
+
+  /*float vPow = 3.3;
+  float r1 = 100000;
+  float r2 = 10000;
+
+  float v = (analogRead(A7) * vPow) / 1024.0;
+  //float v = (475 * vPow) / 1024.0;
+  float v2 = v / (r2 / (r1 + r2));
+  
+  float top = 4.2;
+  float bottom = 3.6;
+  float range = top - bottom;
+  float rangeVolts = v2 - bottom;
+  
+  int percent = (rangeVolts / range) * 100;
+  if(percent > 100){
+    percent = 100;
+  }
+  if(percent < 0) {
+    percent = 0;
+  }
+
+  
+  Serial.print("  Battery: ");
+  Serial.print(percent); Serial.println("%");
+  return percent;*/
 }
