@@ -133,33 +133,25 @@ void loop() ////////////////////////////////////////////////////////////////////
   while (true) {
     // Check for incoming messages
     if (rf95.available()) {
+      Serial.println("  Message available.");
       // Receive message
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
       uint8_t len = sizeof(buf);
       if (rf95.recv(buf, &len)) {
+        Serial.println("  Message received!");
         // Flash neopixel red
         flashNeopixel(255, 0, 0, 127);
         char* receivedMessage = ((char*) buf);
 
-        if ((String) receivedMessage == (String) "*") {
-          // Do nothing, message received is an ack
-          flashNeopixel(0, 255, 0, 50);
-        }
-        else {
-          messageArray[messageArrayIndex] = receivedMessage;
-          messageArrayIndex++;
+        messageArray[messageArrayIndex] = receivedMessage;
+        messageArrayIndex++;
 
-          drawMessageArea();
-   
-          // Acknowledge receipt of message
-          //sendAck();
-          flashNeopixel(255, 0, 0, 10);
-        }
-        // Clear receiveBuffer
-        for (int i = 0; i <= len; i++) {
-          buf[i] = 0;
-        }
+        drawMessageArea();
       }
+      // Clear receiveBuffer
+      for (int i = 0; i <= len; i++) {
+        buf[i] = 0;
+      }        
     }
 
     if (keyboard.keyCount()) {
@@ -240,7 +232,7 @@ void drawStatusBar() ///////////////////////////////////////////////////////////
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 1024; // convert to voltage
   Serial.print("VBat: " ); Serial.println(measuredvbat);
-  */
+  tft.print(measuredvbat);*/
   tft.print("100%");
 
   Serial.println("Completing drawStatusBar()");
@@ -297,55 +289,21 @@ void sendLoRaMessage(const char* text) /////////////////////////////////////////
 
   //rf95.setModeTx();  
   if(rf95.send((uint8_t*)message, strlen(message))) {
-    /*Serial.print("Adding message to the array in spot #");
-    Serial.print(messageArrayIndex);
-    Serial.print(": ");
-    Serial.println(message);*/
-    
     rf95.waitPacketSent();
     // Flash neopixel green
     flashNeopixel(0, 255, 0, 1);
-    Serial.println("Message sent!");
+    Serial.println("  Message sent!");
 
     messageArray[messageArrayIndex++] = message;
-    // Acknowledgment
-    /*Serial.println(" Awaiting ACK...");
-    delay(2000);    
-    // Wait up to 5 seconds to receive ack
-    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-    uint8_t len = sizeof(buf);
-    bool messageAcked = false;
-    for(int i = 0; i < 5; i++) {    
-      if (rf95.available()) {
-        rf95.recv(buf, &len);
-        char* receivedMessage = ((char*) buf);
-        if ((String) receivedMessage == (String) "*") {
-          messageAcked = true;
-          flashNeopixel(255, 0, 255, 1);
-        }
-      }
-      else {
-        delay(1000);
-      }
-    }
-
-    // If message is not acked, append it to messageArray with an asterisk
-    if(messageAcked) {
-      messageArray[messageArrayIndex++] = message;
-    }
-    else {
-      //messageArray[messageArrayIndex++] = (message += "*");
-    }*/
   }
   else {
     Serial.println("ERROR: could not send message!");
   }
   
   drawMessageArea();
-  
   clearInputBuffer();
   
-  Serial.println("Completing sendLoRaMessage()");
+  Serial.println(" Completing sendLoRaMessage()");
 }
 
 void sendAck() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,7 +323,7 @@ void updateScreen() ////////////////////////////////////////////////////////////
 
   drawInputBar(inputBuffer);
 
-  Serial.println("Completing updateScreen()");
+  Serial.println(" Completing updateScreen()");
 }
 
 void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -379,7 +337,7 @@ void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t bright) ////////////
   neopixel.show();
   delay(50);
 
-  Serial.println("Calling flashNeoPixel()");
+  Serial.println(" Completing flashNeoPixel()");
 }
 
 void clearInputBuffer() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
