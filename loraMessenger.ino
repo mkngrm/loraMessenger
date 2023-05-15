@@ -107,16 +107,9 @@ void setup() ///////////////////////////////////////////////////////////////////
   Serial.begin(4800);
   Serial.println("Beginning setup...");
   
-  // Initialize LoRa
-  if (!rf95.init()) {
-    Serial.println("LoRa init failed!");
-  }
-  if (!rf95.setFrequency(915.0)) {
-    Serial.println("setFrequency failed!");
-  }
-  if (!rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512)) {
-    Serial.println("setModemConfig failed!");
-  }
+  rf95.init();
+  rf95.setFrequency(915.0);
+  rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512);
   //rf95.setTxPower(23, false); // 23dBm, +20dB boost
 
   // Initialize Screen
@@ -248,8 +241,6 @@ void loop() ////////////////////////////////////////////////////////////////////
 
 void setUsername() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling setUsername()");
-  
   tft.setTextColor(MESSAGE_TEXT_COLOR);
   tft.setTextSize(1); 
   tft.setCursor(0, TFT_HEIGHT - INPUT_BAR_HEIGHT - 10);  
@@ -280,14 +271,10 @@ void setUsername() /////////////////////////////////////////////////////////////
 
   clearInputBuffer();
   updateScreen(); 
-  
-  Serial.println(" Completing setUsername()");
 }
 
 void drawStatusBar() //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling drawStatusBar()");
-
   // Draw status bar at the top and print device name
   tft.fillRect(0, 0, TFT_WIDTH, STATUS_BAR_HEIGHT, STATUS_BAR_COLOR);
   tft.setTextColor(STATUS_BAR_TEXT_COLOR);
@@ -309,14 +296,10 @@ void drawStatusBar() ///////////////////////////////////////////////////////////
   }*/
 
   tft.printf("%3d", batteryPercent); tft.print("%");
-  
-  Serial.println(" Completing drawStatusBar()");
 }
 
 void drawMessageArea() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling drawMessageArea()");
-  
   // Draw message area in the middle
   tft.fillRect(0, STATUS_BAR_HEIGHT, TFT_WIDTH, (TFT_HEIGHT - (STATUS_BAR_HEIGHT + INPUT_BAR_HEIGHT)), MESSAGE_WINDOW_COLOR);
   tft.setTextSize(1);
@@ -334,14 +317,10 @@ void drawMessageArea() /////////////////////////////////////////////////////////
     tft.println((String) messageArray[i]);  
     messagesDisplayed++;
   }
-
-  Serial.println(" Completing drawMessageArea()");
 }
 
 void drawInputBar(const char* text) ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling drawInputBar()");
-  
   // Draw input bar at the bottom
   //tft.fillRoundRect(0, (TFT_HEIGHT - INPUT_BAR_HEIGHT), TFT_WIDTH, INPUT_BAR_HEIGHT, 10, INPUT_BAR_COLOR);
   tft.fillRect(0, (TFT_HEIGHT - INPUT_BAR_HEIGHT), TFT_WIDTH, INPUT_BAR_HEIGHT, INPUT_BAR_COLOR);
@@ -349,13 +328,10 @@ void drawInputBar(const char* text) ////////////////////////////////////////////
   tft.setTextSize(2);
   tft.setCursor(5, (TFT_HEIGHT - INPUT_BAR_HEIGHT + 1));
   tft.print(text);
-
-  Serial.println(" Completing drawInputBar()");
 }
 
 void sendLoRaMessage(const char* text) ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling sendLoRaMessage()");  
   char message[256];
   
   snprintf(message, sizeof(message), "[%s] %s", DEVICE_NAME, text); // Add device name to the beginning of the message
@@ -378,8 +354,6 @@ void sendLoRaMessage(const char* text) /////////////////////////////////////////
   drawStatusBar();
   drawMessageArea();
   clearInputBuffer();
-  
-  Serial.println(" Completing sendLoRaMessage()");
 }
 
 void sendAck() ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,19 +365,13 @@ void sendAck() /////////////////////////////////////////////////////////////////
 
 void updateScreen() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling updateScreen()");
-  
   drawStatusBar();
   drawMessageArea();
   drawInputBar(inputBuffer);
-
-  Serial.println(" Completing updateScreen()");
 }
 
 void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t count) ///////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling flashNeoPixel()");
-
   for (int i = 0; i < count; i++) {
     neopixel.setPixelColor(0, r, g, b);
     neopixel.show();
@@ -412,26 +380,19 @@ void flashNeopixel(uint8_t r, uint8_t g, uint8_t b, uint8_t count) /////////////
     neopixel.show();
     delay(50);
   }
-  Serial.println(" Completing flashNeoPixel()");
 }
 
 void clearInputBuffer() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling clearInputBUffer()");
-
   for(int i = 0; i <= inputBufferIndex; i++) {
     inputBuffer[i] = 0;    
   }
   inputBufferIndex = 0;
   drawInputBar(inputBuffer);
-
-  Serial.println(" inputBuffer Cleared");  
 }
 
 int readVoltage() /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 {
-  Serial.println("Calling readVoltage()"); 
-   
   float voltageLevel = (analogRead(VBATPIN) * 2 * 3.3 / 1024) - 2; 
   int batteryPercent = (int) ((voltageLevel / 4.2) * 100);
 
@@ -439,7 +400,6 @@ int readVoltage() //////////////////////////////////////////////////////////////
   tft.setRotation(1);
   
   return batteryPercent;
-  Serial.println(" Completing readVoltage()");  
 }
 
 void setBacklight() ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
