@@ -10,9 +10,7 @@
  *  Send ack
  *    Resend until message acked
  *  Change screen/keyboard brightness based on ambient light -or- use keyboard buttons to increment/decrement
- *  Send broadcast when user comes online
  *  Shutoff when battery voltage too low
- *  Use keyboard button to ping users in range
  *  
  *  WHEN COMPLETE, BUMP UP TX POWER LEVEL
  */
@@ -184,7 +182,8 @@ void loop() ////////////////////////////////////////////////////////////////////
           break; 
         }
         else if (key.key == 6) { // Keyboard button 1 - Ping local users to see who's available
-          
+          char* text = "sent a ping!";
+          announceUser(text);  
         }
         else if (key.key == 17) { // Keyboard button 2 - 
           
@@ -270,6 +269,10 @@ void setUsername() /////////////////////////////////////////////////////////////
   }
 
   clearInputBuffer();
+
+  char* text = "is online.";
+  announceUser(text);
+  
   updateScreen(); 
 }
 
@@ -407,4 +410,24 @@ void setBacklight() ////////////////////////////////////////////////////////////
   // Read current ambient light
 
   // Calculate 
+}
+
+void announceUser(const char* text) ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+{
+  char announcement[256];
+  //char* text = "is online.";
+  
+  snprintf(announcement, sizeof(announcement), "%s %s", DEVICE_NAME, text); // Add device name to the beginning of the message
+  //rf95.setModeTx();  
+  if(rf95.send((uint8_t*)announcement, strlen(announcement))) {
+    rf95.waitPacketSent();
+    // Flash neopixel blue
+    flashNeopixel(0, 0, 255, 1);
+    Serial.println("  User announcement sent!");
+  }
+  else {
+    Serial.println("ERROR: could not send user announcement!");
+  }
+  
+  drawStatusBar();
 }
