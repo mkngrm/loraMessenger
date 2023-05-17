@@ -10,6 +10,7 @@
  *  Send ack
  *    Resend 5x or until message acked
  *  Shutoff when battery voltage too low
+ *  Auto control brightness via ambient light sensor, override with keyboard
  *  
  *  WHEN COMPLETE, BUMP UP TX POWER LEVEL
  */
@@ -132,8 +133,7 @@ void loop() ////////////////////////////////////////////////////////////////////
 {  
   // Wait for user input from the attached keyboard FeatherWing
   while (true) {
-    // Check for incoming messages
-    if (rf95.available()) {
+    if (rf95.available()) { /////////////////////////////////////////////////////////////////////////////////////////////////////////////////// WAIT FOR INCOMING MESSAGES
       Serial.println("  Message available.");
       // Receive message
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
@@ -166,7 +166,54 @@ void loop() ////////////////////////////////////////////////////////////////////
 
     if (keyboard.keyCount()) {
       const BBQ10Keyboard::KeyEvent key = keyboard.keyEvent();
-      if (key.state == BBQ10Keyboard::StateRelease) {
+      if (key.state == BBQ10Keyboard::StateLongPress) { /////////////////////////////////////////////////////////////////////////////////////// HANDLE LONG PRESS OF A KEY
+        if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is held, ...
+   
+        } 
+        else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is held, ...
+
+        }
+        else if (key.key == '\n' && inputBufferIndex > 0) { // If enter key is held, ...
+          
+        }
+        else if (key.key == 6) { // If Keyboard button 1 is held - Ping local users to let them know you're going offline
+          char* text = "is going offline!";
+          announceUser(text);
+          keyboard.clearInterruptStatus();
+        }
+        else if (key.key == 17) { // Keyboard button 2 - 
+          
+        }
+        else if (key.key == 1) { // Joystick Up - Scroll to top of message array 
+          
+        }
+        else if (key.key == 2) { // Joystick Down - Scroll to bottom of message array
+          
+        }
+        else if (key.key == 3) { // Joystick Left - 
+          
+        }
+        else if (key.key == 4) { // Joystick Right - 
+          
+        }
+        else if (key.key == 5) { // Joystick Click - 
+          
+        }
+        else if (key.key == 7) { // Keyboard button 3 - Set keyboard brightness to off
+          KEYBOARD_BACKLIGHT = 0;
+          keyboard.setBacklight(KEYBOARD_BACKLIGHT);
+          keyboard.setBacklight2(KEYBOARD_BACKLIGHT);
+        }
+        else if (key.key == 18) { // Keyboard button 4 - Set keyboard brightness to max
+          KEYBOARD_BACKLIGHT = 1.0;
+          keyboard.setBacklight(KEYBOARD_BACKLIGHT);
+          keyboard.setBacklight2(KEYBOARD_BACKLIGHT);
+        }
+        else { // Unmapped key pressed, output value to determine usability
+          Serial.printf("key: '%c' (dec %d, hex %02x)\r\n", key.key, key.key, key.key);
+        }
+      }      
+      else if (key.state == BBQ10Keyboard::StateRelease) { /////////////////////////////////////////////////////////////////////////////////////// HANDLE RELEASE OF A KEY
         if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
           inputBuffer[inputBufferIndex++] = key.key;
           drawInputBar(inputBuffer);       
@@ -206,75 +253,20 @@ void loop() ////////////////////////////////////////////////////////////////////
           if (KEYBOARD_BACKLIGHT > 0) {
             KEYBOARD_BACKLIGHT -= .25;
             keyboard.setBacklight(KEYBOARD_BACKLIGHT);
-            if (KEYBOARD_BACKLIGHT == 0) {
-              tft.writeCommand(0x10); // Sleep
-              delay(5); // Delay for shutdown time before another command can be sent
-            }
+            keyboard.setBacklight2(KEYBOARD_BACKLIGHT);
           }
         }
         else if (key.key == 18) { // Keyboard button 4 - Increment keyboard brightness by 10%
-          if (KEYBOARD_BACKLIGHT < 1.0) {
-            if (KEYBOARD_BACKLIGHT == 0) {
-              tft.writeCommand(0x11); // Wake display
-              delay(120); // Delay for pwer supplies to stabilise
-            }            
+          if (KEYBOARD_BACKLIGHT < 1.0) {       
             KEYBOARD_BACKLIGHT += .25;
             keyboard.setBacklight(KEYBOARD_BACKLIGHT);
-            
+            keyboard.setBacklight2(KEYBOARD_BACKLIGHT);
           }          
         }
         else { // Unmapped key pressed, output value to determine usability
           Serial.printf("key: '%c' (dec %d, hex %02x)\r\n", key.key, key.key, key.key);
         }
       }
-      else if (key.state == BBQ10Keyboard::StateLongPress) { // Additional functionality with a long press /////////////////////////////// HANDLE LONG PRESS OF A KEY
-        if (key.key >= 32 && key.key <= 126 && inputBufferIndex < 255) { // If printable character is entered, append it to text
-          inputBuffer[inputBufferIndex++] = key.key;
-          drawInputBar(inputBuffer);       
-        } 
-        else if (key.key == '\x08' && inputBufferIndex >= 0) { // If backspace key is pressed, delete previous character
-          inputBuffer[inputBufferIndex--] = 0;
-          drawInputBar(inputBuffer);
-        }
-        else if (key.key == '\n' && inputBufferIndex > 0) { // If enter key is pressed, send the text as a LoRa message
-          inputBuffer[inputBufferIndex] = '\0'; // Null-terminate the text
-          sendLoRaMessage((char*) inputBuffer);
-          break; 
-        }
-        else if (key.key == 6) { // Keyboard button 1 - Ping local users to see who's available
-          char* text = "is going offline!";
-          announceUser(text);  
-        }
-        else if (key.key == 17) { // Keyboard button 2 - 
-          
-        }
-        else if (key.key == 1) { // Joystick Up - 
-          
-        }
-        else if (key.key == 2) { // Joystick Down - 
-          
-        }
-        else if (key.key == 3) { // Joystick Left - 
-          
-        }
-        else if (key.key == 4) { // Joystick Right - 
-          
-        }
-        else if (key.key == 5) { // Joystick Click - 
-          
-        }
-        else if (key.key == 7) { // Keyboard button 3 - Set keyboard brightness to off
-          KEYBOARD_BACKLIGHT = 0;
-          keyboard.setBacklight(KEYBOARD_BACKLIGHT);
-        }
-        else if (key.key == 18) { // Keyboard button 4 - Set keyboard brightness to max
-          KEYBOARD_BACKLIGHT = 1.0;
-          keyboard.setBacklight(KEYBOARD_BACKLIGHT);
-        }
-        else { // Unmapped key pressed, output value to determine usability
-          Serial.printf("key: '%c' (dec %d, hex %02x)\r\n", key.key, key.key, key.key);
-        }
-      }      
       else { // Additional functionality with a short press
         
       }
